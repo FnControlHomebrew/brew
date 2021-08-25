@@ -279,7 +279,9 @@ module Homebrew
               i += 1
             end
           rescue OptionParser::InvalidOption
-            if ignore_invalid_options
+            if ignore_invalid_options ||
+               # Allow commands that look like options. For example: brew command --cache
+               (@named_args_type == :command && Commands.path(arg))
               remaining << arg
             else
               $stderr.puts generate_help_text
