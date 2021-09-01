@@ -14,7 +14,7 @@ module Homebrew
   module Upgrade
     module_function
 
-    def upgrade_formulae(
+    def create_formula_installers(
       formulae_to_install,
       flags:,
       dry_run: false,
@@ -28,7 +28,7 @@ module Homebrew
       quiet: false,
       verbose: false
     )
-      return if formulae_to_install.empty?
+      return [] if formulae_to_install.empty?
 
       # Sort keg-only before non-keg-only formulae to avoid any needless conflicts
       # with outdated, non-keg-only versions of formulae being upgraded.
@@ -42,7 +42,7 @@ module Homebrew
         end
       end
 
-      formula_installers = formulae_to_install.map do |formula|
+      formulae_to_install.map do |formula|
         Migrator.migrate_if_needed(formula, force: force, dry_run: dry_run)
         begin
           fi = create_formula_installer(
@@ -58,19 +58,28 @@ module Homebrew
             quiet:                      quiet,
             verbose:                    verbose,
           )
-          unless dry_run
-            fi.prelude
-            fi.fetch
-          end
+          fi.prelude unless dry_run
           fi
         rescue CannotInstallFormulaError => e
           ofail e
-        rescue UnsatisfiedRequirements, DownloadError => e
+        rescue UnsatisfiedRequirements => e
           ofail "#{formula}: #{e}"
           nil
         end
       end.compact
+    end
 
+    def fetch_formulae(formula_installers)
+      formula_installers.select! do |fi|
+        fi.fetch
+        true
+      rescue DownloadError => e
+        ofail "#{fi.formula}: #{e}"
+        false
+      end
+    end
+
+    def upgrade_formulae(formula_installers, dry_run: false, verbose: false)
       formula_installers.each do |fi|
         upgrade_formula(fi, dry_run: dry_run, verbose: verbose)
         Cleanup.install_formula_clean!(fi.formula, dry_run: dry_run)
@@ -287,7 +296,7 @@ module Homebrew
       end
 
       unless dry_run
-        upgrade_formulae(
+        dependent_installers = create_formula_installers(
           upgradeable_dependents,
           flags:                      flags,
           installed_on_request:       installed_on_request,
@@ -300,6 +309,8 @@ module Homebrew
           quiet:                      quiet,
           verbose:                    verbose,
         )
+        fetch_formulae(dependent_installers)
+        upgrade_formulae(dependent_installers, dry_run: dry_run, verbose: verbose)
       end
 
       # Update installed formulae after upgrading

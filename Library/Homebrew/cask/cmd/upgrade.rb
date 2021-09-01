@@ -3,6 +3,7 @@
 
 require "env_config"
 require "cask/config"
+require "cask/installer"
 
 module Cask
   class Cmd
@@ -44,7 +45,7 @@ module Cask
       sig { void }
       def run
         verbose = ($stdout.tty? || args.verbose?) && !args.quiet?
-        self.class.upgrade_casks(
+        cask_installers = self.class.create_cask_installers(
           *casks,
           force:               args.force?,
           greedy:              args.greedy?,
@@ -58,6 +59,14 @@ module Cask
           verbose:             verbose,
           args:                args,
         )
+        return if args.dry_run?
+
+        caught_exceptions = []
+        self.class.fetch_casks(cask_installers) { |e| caught_exceptions << e }
+        self.class.upgrade_casks(cask_installers) { |e| caught_exceptions << e }
+        return if caught_exceptions.empty?
+        raise MultipleCaskErrors, caught_exceptions if caught_exceptions.count > 1
+        raise caught_exceptions.first if caught_exceptions.count == 1
       end
 
       sig {
@@ -74,9 +83,9 @@ module Cask
           binaries:            T.nilable(T::Boolean),
           quarantine:          T.nilable(T::Boolean),
           require_sha:         T.nilable(T::Boolean),
-        ).returns(T::Boolean)
+        ).returns(T::Array[T::Array[Installer]])
       }
-      def self.upgrade_casks(
+      def self.create_cask_installers(
         *casks,
         args:,
         force: false,
@@ -117,7 +126,7 @@ module Cask
           outdated_casks -= manual_installer_casks
         end
 
-        return false if outdated_casks.empty?
+        return [] if outdated_casks.empty?
 
         if casks.empty? && !greedy
           if !args.greedy_auto_updates? && !args.greedy_latest?
@@ -135,39 +144,43 @@ module Cask
         verb = dry_run ? "Would upgrade" : "Upgrading"
         oh1 "#{verb} #{outdated_casks.count} outdated #{"package".pluralize(outdated_casks.count)}:"
 
-        caught_exceptions = []
-
         upgradable_casks = outdated_casks.map { |c| [CaskLoader.load(c.installed_caskfile), c] }
 
         puts upgradable_casks
           .map { |(old_cask, new_cask)| "#{new_cask.full_name} #{old_cask.version} -> #{new_cask.version}" }
           .join("\n")
-        return true if dry_run
 
-        upgradable_casks.each do |(old_cask, new_cask)|
-          upgrade_cask(
+        upgradable_casks.map do |(old_cask, new_cask)|
+          create_cask_installer_pair(
             old_cask, new_cask,
             binaries: binaries, force: force, skip_cask_deps: skip_cask_deps, verbose: verbose,
             quarantine: quarantine, require_sha: require_sha
           )
-        rescue => e
-          caught_exceptions << e.exception("#{new_cask.full_name}: #{e}")
-          next
         end
-
-        return true if caught_exceptions.empty?
-        raise MultipleCaskErrors, caught_exceptions if caught_exceptions.count > 1
-        raise caught_exceptions.first if caught_exceptions.count == 1
       end
 
-      def self.upgrade_cask(
+      def self.fetch_casks(cask_installers)
+        cask_installers.select! do |(_old_cask_installer, new_cask_installer)|
+          new_cask_installer.fetch
+          true
+        rescue CaskError, DownloadError, ChecksumMismatchError => e
+          yield e.exception("#{new_cask_installer.cask.full_name}: #{e}")
+          false
+        end
+      end
+
+      def self.upgrade_casks(cask_installers)
+        cask_installers.each do |(old_cask_installer, new_cask_installer)|
+          upgrade_cask(old_cask_installer, new_cask_installer)
+        rescue CaskError => e
+          yield e.exception("#{new_cask_installer.cask.full_name}: #{e}")
+        end
+      end
+
+      def self.create_cask_installer_pair(
         old_cask, new_cask,
         binaries:, force:, quarantine:, require_sha:, skip_cask_deps:, verbose:
       )
-        require "cask/installer"
-
-        start_time = Time.now
-        odebug "Started upgrade process for Cask #{old_cask}"
         old_config = old_cask.config
 
         old_options = {
@@ -195,6 +208,16 @@ module Cask
         new_cask_installer =
           Installer.new(new_cask, **new_options)
 
+        [old_cask_installer, new_cask_installer]
+      end
+
+      def self.upgrade_cask(old_cask_installer, new_cask_installer)
+        old_cask = old_cask_installer.cask
+        new_cask = new_cask_installer.cask
+
+        start_time = Time.now
+        odebug "Started upgrade process for Cask #{old_cask}"
+
         started_upgrade = false
         new_artifacts_installed = false
 
@@ -207,8 +230,6 @@ module Cask
           if (caveats = new_cask_installer.caveats)
             puts caveats
           end
-
-          new_cask_installer.fetch
 
           # Move the old cask's artifacts back to staging
           old_cask_installer.start_upgrade

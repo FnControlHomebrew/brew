@@ -47,6 +47,8 @@ module Cask
       @quiet = quiet
     end
 
+    attr_reader :cask
+
     attr_predicate :binaries?, :force?, :skip_cask_deps?, :require_sha?,
                    :reinstall?, :upgrade?, :verbose?, :installed_as_dependency?,
                    :quarantine?, :quiet?
