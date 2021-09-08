@@ -218,8 +218,12 @@ class FormulaInstaller
     raise
   end
 
+  def installation_already_attempted
+    self.class.attempted.include?(formula)
+  end
+
   def check_install_sanity
-    raise FormulaInstallationAlreadyAttemptedError, formula if self.class.attempted.include?(formula)
+    raise FormulaInstallationAlreadyAttemptedError, formula if installation_already_attempted
 
     if force_bottle? && !pour_bottle?
       raise CannotInstallFormulaError, "--force-bottle passed but #{formula.full_name} has no bottle!"
