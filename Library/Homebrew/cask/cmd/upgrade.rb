@@ -141,14 +141,7 @@ module Cask
           end
         end
 
-        verb = dry_run ? "Would upgrade" : "Upgrading"
-        oh1 "#{verb} #{outdated_casks.count} outdated #{"package".pluralize(outdated_casks.count)}:"
-
         upgradable_casks = outdated_casks.map { |c| [CaskLoader.load(c.installed_caskfile), c] }
-
-        puts upgradable_casks
-          .map { |(old_cask, new_cask)| "#{new_cask.full_name} #{old_cask.version} -> #{new_cask.version}" }
-          .join("\n")
 
         upgradable_casks.map do |(old_cask, new_cask)|
           create_cask_installer_pair(

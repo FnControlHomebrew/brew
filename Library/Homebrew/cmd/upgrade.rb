@@ -116,12 +116,36 @@ module Homebrew
       create_cask_installers(casks, args: args)
     end
 
+    display_outdated_packages(formula_installers, cask_installers, args: args)
     fetch_outdated_formulae(formula_installers, args: args)
     fetch_outdated_casks(cask_installers, args: args)
     upgrade_outdated_formulae(formula_installers, args: args)
     upgrade_outdated_casks(cask_installers, args: args)
 
     Homebrew.messages.display_messages(display_times: args.display_times?)
+  end
+
+  def display_outdated_packages(formula_installers, cask_installers, args:)
+    if formula_installers.empty? && cask_installers.empty?
+      oh1 "No packages to upgrade"
+      return
+    end
+    verb = args.dry_run? ? "Would upgrade" : "Upgrading"
+    count = formula_installers.count + cask_installers.count
+    oh1 "#{verb} #{count} outdated #{"package".pluralize(count)}:"
+    formula_installers.each do |fi|
+      f = fi.formula
+      if f.optlinked?
+        puts "#{f.full_specified_name} #{Keg.new(f.opt_prefix).version} -> #{f.pkg_version}"
+      else
+        puts "#{f.full_specified_name} #{f.pkg_version}"
+      end
+    end
+    cask_installers.each do |(old_cask_installer, new_cask_installer)|
+      old_cask = old_cask_installer.cask
+      new_cask = new_cask_installer.cask
+      puts "#{new_cask.full_name} #{old_cask.version} -> #{new_cask.version}"
+    end
   end
 
   sig { params(formulae: T::Array[Formula], args: CLI::Args).returns(T::Array[FormulaInstaller]) }
@@ -182,21 +206,6 @@ module Homebrew
       rescue FormulaUnavailableError
         formula
       end
-    end
-
-    if formulae_to_install.empty?
-      oh1 "No packages to upgrade"
-    else
-      verb = args.dry_run? ? "Would upgrade" : "Upgrading"
-      oh1 "#{verb} #{formulae_to_install.count} outdated #{"package".pluralize(formulae_to_install.count)}:"
-      formulae_upgrades = formulae_to_install.map do |f|
-        if f.optlinked?
-          "#{f.full_specified_name} #{Keg.new(f.opt_prefix).version} -> #{f.pkg_version}"
-        else
-          "#{f.full_specified_name} #{f.pkg_version}"
-        end
-      end
-      puts formulae_upgrades.join("\n")
     end
 
     Upgrade.create_formula_installers(
