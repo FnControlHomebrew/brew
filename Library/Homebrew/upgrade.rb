@@ -73,7 +73,7 @@ module Homebrew
       formula_installers.select! do |fi|
         fi.fetch
         true
-      rescue DownloadError => e
+      rescue DownloadError, ChecksumMismatchError => e
         ofail "#{fi.formula}: #{e}"
         false
       end
