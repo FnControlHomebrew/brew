@@ -273,7 +273,9 @@ module Homebrew
       skip_cask_deps: args.skip_cask_deps?,
       verbose:        args.verbose?,
       args:           args,
-    )
+    ) do |exception|
+      ofail exception.message
+    end
   end
 
   def fetch_outdated_casks(cask_installers, args:)

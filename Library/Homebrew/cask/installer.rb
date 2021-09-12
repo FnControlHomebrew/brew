@@ -75,7 +75,7 @@ module Cask
 
       download(quiet: quiet, timeout: timeout)
 
-      satisfy_dependencies
+      satisfy_dependencies(install_missing: true)
     end
 
     def stage
@@ -266,12 +266,12 @@ module Cask
     # TODO: move dependencies to a separate class,
     #       dependencies should also apply for `brew cask stage`,
     #       override dependencies with `--force` or perhaps `--force-deps`
-    def satisfy_dependencies
+    def satisfy_dependencies(install_missing:)
       return unless @cask.depends_on
 
       macos_dependencies
       arch_dependencies
-      cask_and_formula_dependencies
+      cask_and_formula_dependencies(install_missing: install_missing)
     end
 
     def macos_dependencies
@@ -354,12 +354,14 @@ module Cask
       end
     end
 
-    def cask_and_formula_dependencies
+    def cask_and_formula_dependencies(install_missing:)
       return if installed_as_dependency?
 
       formulae_and_casks = collect_cask_and_formula_dependencies
 
       return if formulae_and_casks.empty?
+
+      return unless install_missing
 
       missing_formulae_and_casks = missing_cask_and_formula_dependencies
 

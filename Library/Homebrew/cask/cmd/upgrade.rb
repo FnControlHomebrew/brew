@@ -45,6 +45,7 @@ module Cask
       sig { void }
       def run
         verbose = ($stdout.tty? || args.verbose?) && !args.quiet?
+        caught_exceptions = []
         cask_installers = self.class.create_cask_installers(
           *casks,
           force:               args.force?,
@@ -58,12 +59,13 @@ module Cask
           skip_cask_deps:      args.skip_cask_deps?,
           verbose:             verbose,
           args:                args,
-        )
-        return if args.dry_run?
-
-        caught_exceptions = []
-        self.class.fetch_casks(cask_installers) { |e| caught_exceptions << e }
-        self.class.upgrade_casks(cask_installers) { |e| caught_exceptions << e }
+        ) do |e|
+          caught_exceptions << e
+        end
+        unless args.dry_run?
+          self.class.fetch_casks(cask_installers) { |e| caught_exceptions << e }
+          self.class.upgrade_casks(cask_installers) { |e| caught_exceptions << e }
+        end
         return if caught_exceptions.empty?
         raise MultipleCaskErrors, caught_exceptions if caught_exceptions.count > 1
         raise caught_exceptions.first if caught_exceptions.count == 1
@@ -144,12 +146,17 @@ module Cask
         upgradable_casks = outdated_casks.map { |c| [CaskLoader.load(c.installed_caskfile), c] }
 
         upgradable_casks.map do |(old_cask, new_cask)|
-          create_cask_installer_pair(
+          old_cask_installer, new_cask_installer = create_cask_installer_pair(
             old_cask, new_cask,
             binaries: binaries, force: force, skip_cask_deps: skip_cask_deps, verbose: verbose,
             quarantine: quarantine, require_sha: require_sha
           )
-        end
+          new_cask_installer.satisfy_dependencies(install_missing: false)
+          [old_cask_installer, new_cask_installer]
+        rescue CaskError => e
+          yield e.exception("#{new_cask.full_name}: #{e}")
+          nil
+        end.compact
       end
 
       def self.fetch_casks(cask_installers)
