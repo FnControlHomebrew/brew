@@ -24,14 +24,13 @@ class Messages
     @install_times.push(package: package, time: elapsed_time)
   end
 
-  def display_messages(force_caveats: false, display_times: false)
-    display_caveats(force: force_caveats)
+  def display_messages(display_times: false)
+    display_caveats
     display_install_times if display_times
   end
 
-  def display_caveats(force: false)
-    return if @package_count.zero?
-    return if @package_count == 1 && !force
+  def display_caveats
+    return if @package_count <= 1
     return if @caveats.empty?
 
     oh1 "Caveats"
