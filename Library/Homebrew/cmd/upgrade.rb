@@ -110,9 +110,9 @@ module Homebrew
     Homebrew.messages.display_messages(display_times: args.display_times?)
   end
 
-  sig { params(formulae: T::Array[Formula], args: CLI::Args).returns(T::Boolean) }
+  sig { params(formulae: T::Array[Formula], args: CLI::Args).void }
   def upgrade_outdated_formulae(formulae, args:)
-    return false if args.cask?
+    return if args.cask?
 
     if args.build_from_source? && !DevelopmentTools.installed?
       raise BuildFlagsError.new(["--build-from-source"], bottled: formulae.all?(&:bottled?))
@@ -140,7 +140,7 @@ module Homebrew
       end
     end
 
-    return false if outdated.blank?
+    return if outdated.blank?
 
     pinned = outdated.select(&:pinned?)
     outdated -= pinned
@@ -214,13 +214,11 @@ module Homebrew
       quiet:                      args.quiet?,
       verbose:                    args.verbose?,
     )
-
-    true
   end
 
-  sig { params(casks: T::Array[Cask::Cask], args: CLI::Args).returns(T::Boolean) }
+  sig { params(casks: T::Array[Cask::Cask], args: CLI::Args).void }
   def upgrade_outdated_casks(casks, args:)
-    return false if args.formula?
+    return if args.formula?
 
     if ENV["HOMEBREW_INSTALL_FROM_API"].present?
       casks = casks.map do |cask|
