@@ -58,6 +58,7 @@ module Cask
           verbose:             verbose,
           args:                args,
         )
+        Homebrew.messages.raise_caught_exceptions
       end
 
       sig {
@@ -135,8 +136,6 @@ module Cask
         verb = dry_run ? "Would upgrade" : "Upgrading"
         oh1 "#{verb} #{outdated_casks.count} outdated #{"package".pluralize(outdated_casks.count)}:"
 
-        caught_exceptions = []
-
         upgradable_casks = outdated_casks.map { |c| [CaskLoader.load(c.installed_caskfile), c] }
 
         puts upgradable_casks
@@ -151,13 +150,9 @@ module Cask
             quarantine: quarantine, require_sha: require_sha
           )
         rescue => e
-          caught_exceptions << e.exception("#{new_cask.full_name}: #{e}")
+          Homebrew.messages.catch_exception(new_cask.full_name, e, display_message: false)
           next
         end
-
-        return if caught_exceptions.empty?
-        raise MultipleCaskErrors, caught_exceptions if caught_exceptions.count > 1
-        raise caught_exceptions.first if caught_exceptions.count == 1
       end
 
       def self.upgrade_cask(

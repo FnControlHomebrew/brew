@@ -108,6 +108,7 @@ module Homebrew
     upgrade_outdated_casks(casks, args: args) unless only_upgrade_formulae
 
     Homebrew.messages.display_messages(display_times: args.display_times?)
+    Homebrew.messages.raise_caught_exceptions
   end
 
   sig { params(formulae: T::Array[Formula], args: CLI::Args).void }

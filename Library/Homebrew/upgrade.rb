@@ -71,10 +71,8 @@ module Homebrew
             fi.fetch
           end
           fi
-        rescue CannotInstallFormulaError => e
-          ofail e
-        rescue UnsatisfiedRequirements, DownloadError => e
-          ofail "#{formula}: #{e}"
+        rescue CannotInstallFormulaError, UnsatisfiedRequirements, DownloadError => e
+          Homebrew.messages.catch_exception(formula, e, display_message: true)
           nil
         end
       end.compact
@@ -181,9 +179,9 @@ module Homebrew
 
       install_formula(formula_installer, upgrade: true)
     rescue BuildError => e
+      Homebrew.messages.catch_exception(formula, e, display_message: false)
       e.dump(verbose: verbose)
       puts
-      Homebrew.failed = true
     end
     private_class_method :upgrade_formula
 
@@ -376,11 +374,11 @@ module Homebrew
         # another formula. In that case, don't generate an error, just move on.
         nil
       rescue CannotInstallFormulaError, DownloadError => e
-        ofail e
+        Homebrew.messages.catch_exception(formula, e, display_message: true)
       rescue BuildError => e
+        Homebrew.messages.catch_exception(formula, e, display_message: false)
         e.dump(verbose: verbose)
         puts
-        Homebrew.failed = true
       end
     end
 

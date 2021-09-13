@@ -297,10 +297,8 @@ module Homebrew
           fi.prelude
           fi.fetch
           fi
-        rescue CannotInstallFormulaError => e
-          ofail e.message
-        rescue UnsatisfiedRequirements, DownloadError, ChecksumMismatchError => e
-          ofail "#{f}: #{e}"
+        rescue CannotInstallFormulaError, UnsatisfiedRequirements, DownloadError, ChecksumMismatchError => e
+          Homebrew.messages.catch_exception(f, e, display_message: true)
           nil
         end
       end.compact

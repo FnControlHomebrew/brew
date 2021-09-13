@@ -768,3 +768,13 @@ class CyclicDependencyError < RuntimeError
     EOS
   end
 end
+
+# Raised when more than one package produced an error.
+class MultiplePackageErrors < RuntimeError
+  def initialize(errors)
+    super <<~EOS
+      Problems with multiple packages:
+      #{errors.map(&:to_s).join("\n")}
+    EOS
+  end
+end

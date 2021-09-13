@@ -237,6 +237,7 @@ module Homebrew
     )
 
     Homebrew.messages.display_messages(display_times: args.display_times?)
+    Homebrew.messages.raise_caught_exceptions
   rescue FormulaUnreadableError, FormulaClassUnavailableError,
          TapFormulaUnreadableError, TapFormulaClassUnavailableError => e
     # Need to rescue before `FormulaUnavailableError` (superclass of this)

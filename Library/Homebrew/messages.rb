@@ -13,6 +13,7 @@ class Messages
     @caveats = []
     @package_count = 0
     @install_times = []
+    @caught_exceptions = []
   end
 
   def record_caveats(package, caveats)
@@ -46,5 +47,19 @@ class Messages
     install_times.each do |t|
       puts format("%<package>-20s %<time>10.3f s", t)
     end
+  end
+
+  def catch_exception(package, exception, display_message:)
+    exception = exception.exception("#{package}: #{exception}")
+    @caught_exceptions << exception
+    onoe exception.message if display_message
+    Homebrew.failed = true
+  end
+
+  def raise_caught_exceptions
+    return if @package_count <= 1
+    return if @caught_exceptions.empty?
+    raise MultiplePackageErrors, @caught_exceptions if @caught_exceptions.count > 1
+    raise @caught_exceptions.first if @caught_exceptions.count == 1
   end
 end

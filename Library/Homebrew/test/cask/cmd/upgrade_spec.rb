@@ -385,7 +385,7 @@ describe Cask::Cmd::Upgrade, :cask do
 
       expect {
         described_class.run
-      }.to raise_error(Cask::MultipleCaskErrors)
+      }.to raise_error(MultiplePackageErrors)
 
       expect(bad_checksum).to be_installed
       expect(bad_checksum_path).to be_a_directory

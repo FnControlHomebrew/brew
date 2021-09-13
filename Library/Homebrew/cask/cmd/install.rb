@@ -71,6 +71,8 @@ module Cask
           Installer.new(cask, **options).install
         rescue CaskAlreadyInstalledError => e
           opoo e.message
+        rescue CaskError => e
+          Homebrew.messages.catch_exception(cask.full_name, e, display_message: false)
         end
       end
     end

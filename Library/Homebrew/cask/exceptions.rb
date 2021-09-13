@@ -7,27 +7,6 @@ module Cask
   # @api private
   class CaskError < RuntimeError; end
 
-  # Cask error containing multiple other errors.
-  #
-  # @api private
-  class MultipleCaskErrors < CaskError
-    extend T::Sig
-
-    def initialize(errors)
-      super()
-
-      @errors = errors
-    end
-
-    sig { returns(String) }
-    def to_s
-      <<~EOS
-        Problems with multiple casks:
-        #{@errors.map(&:to_s).join("\n")}
-      EOS
-    end
-  end
-
   # Abstract cask error containing a cask token.
   #
   # @api private
