@@ -1,19 +1,21 @@
-# typed: false
+# typed: strict
 # frozen_string_literal: true
 
 module Superenv
   extend T::Sig
 
   class << self
+    extend T::Sig
+
     # The location of Homebrew's shims on macOS.
     # @public
+    sig { returns(Pathname) }
     def shims_path
       HOMEBREW_SHIMS_PATH/"mac/super"
     end
 
-    undef bin
-
     # @private
+    sig { returns(T.nilable(Pathname)) }
     def bin
       return unless DevelopmentTools.installed?
 
@@ -23,14 +25,7 @@ module Superenv
 
   alias x11? x11
 
-  undef homebrew_extra_paths,
-        homebrew_extra_pkg_config_paths, homebrew_extra_aclocal_paths,
-        homebrew_extra_isystem_paths, homebrew_extra_library_paths,
-        homebrew_extra_cmake_include_paths,
-        homebrew_extra_cmake_library_paths,
-        homebrew_extra_cmake_frameworks_paths,
-        determine_cccfg
-
+  sig { returns(T::Array[Pathname]) }
   def homebrew_extra_paths
     paths = []
     paths << MacOS::XQuartz.bin if x11?
@@ -38,6 +33,7 @@ module Superenv
   end
 
   # @private
+  sig { returns(T::Array[String]) }
   def homebrew_extra_pkg_config_paths
     paths = \
       ["/usr/lib/pkgconfig", "#{HOMEBREW_LIBRARY}/Homebrew/os/mac/pkgconfig/#{MacOS.version}"]
@@ -45,6 +41,7 @@ module Superenv
     paths
   end
 
+  sig { returns(T::Array[String]) }
   def homebrew_extra_aclocal_paths
     paths = []
     paths << "#{MacOS::XQuartz.share}/aclocal" if x11?
@@ -60,6 +57,7 @@ module Superenv
     true
   end
 
+  sig { returns(T::Array[String]) }
   def homebrew_extra_isystem_paths
     paths = []
     paths << "#{self["HOMEBREW_SDKROOT"]}/usr/include/libxml2" if libxml2_include_needed?
@@ -69,6 +67,7 @@ module Superenv
     paths
   end
 
+  sig { returns(T::Array[String]) }
   def homebrew_extra_library_paths
     paths = []
     if compiler == :llvm_clang
@@ -80,6 +79,7 @@ module Superenv
     paths
   end
 
+  sig { returns(T::Array[String]) }
   def homebrew_extra_cmake_include_paths
     paths = []
     paths << "#{self["HOMEBREW_SDKROOT"]}/usr/include/libxml2" if libxml2_include_needed?
@@ -89,6 +89,7 @@ module Superenv
     paths
   end
 
+  sig { returns(T::Array[String]) }
   def homebrew_extra_cmake_library_paths
     paths = []
     paths << MacOS::XQuartz.lib.to_s if x11?
@@ -96,12 +97,14 @@ module Superenv
     paths
   end
 
+  sig { returns(T::Array[String]) }
   def homebrew_extra_cmake_frameworks_paths
     paths = []
     paths << "#{self["HOMEBREW_SDKROOT"]}/System/Library/Frameworks" if MacOS::Xcode.without_clt?
     paths
   end
 
+  sig { returns(String) }
   def determine_cccfg
     s = +""
     # Fix issue with >= Mountain Lion apr-1-config having broken paths
@@ -110,6 +113,15 @@ module Superenv
   end
 
   # @private
+  sig {
+    params(
+      formula:         T.nilable(Formula),
+      cc:              T.nilable(String),
+      build_bottle:    T.nilable(T::Boolean),
+      bottle_arch:     T.nilable(String),
+      testing_formula: T::Boolean,
+    ).void
+  }
   def setup_build_environment(formula: nil, cc: nil, build_bottle: false, bottle_arch: nil, testing_formula: false)
     sdk = formula ? MacOS.sdk_for_formula(formula) : MacOS.sdk
     if MacOS.sdk_root_needed? || sdk&.source == :xcode
@@ -153,6 +165,7 @@ module Superenv
     self["HOMEBREW_PREFER_CLT_PROXIES"] = "1"
   end
 
+  sig { void }
   def no_weak_imports
     append_to_cccfg "w" if no_weak_imports_support?
   end

@@ -1,4 +1,4 @@
-# typed: false
+# typed: true
 # frozen_string_literal: true
 
 # Performs {Formula#mktemp}'s functionality, and tracks the results.
@@ -9,11 +9,13 @@ class Mktemp
   include FileUtils
 
   # Path to the tmpdir used in this run, as a {Pathname}.
+  sig { returns(T.nilable(Pathname)) }
   attr_reader :tmpdir
 
+  sig { params(prefix: String, opts: T::Hash[Symbol, T::Boolean]).void }
   def initialize(prefix, opts = {})
     @prefix = prefix
-    @retain = opts[:retain]
+    @retain = opts.fetch(:retain, false)
     @quiet = false
   end
 
@@ -24,6 +26,7 @@ class Mktemp
   end
 
   # True if the staged temporary files should be retained.
+  sig { returns(T::Boolean) }
   def retain?
     @retain
   end
@@ -39,7 +42,8 @@ class Mktemp
     "[Mktemp: #{tmpdir} retain=#{@retain} quiet=#{@quiet}]"
   end
 
-  def run
+  sig { params(_block: Proc).returns(T.untyped) }
+  def run(&_block)
     @tmpdir = Pathname.new(Dir.mktmpdir("#{@prefix.tr "@", "AT"}-", HOMEBREW_TEMP))
 
     # Make sure files inside the temporary directory have the same group as the
@@ -54,15 +58,16 @@ class Mktemp
       Process.gid
     end
     begin
-      chown(nil, group_id, tmpdir)
+      chown(nil, group_id, @tmpdir)
     rescue Errno::EPERM
-      opoo "Failed setting group \"#{Etc.getgrgid(group_id).name}\" on #{tmpdir}"
+      # TODO: print integer ID if no group found?
+      opoo "Failed setting group \"#{T.must(Etc.getgrgid(group_id)).name}\" on #{@tmpdir}"
     end
 
     begin
-      Dir.chdir(tmpdir) { yield self }
+      Dir.chdir(@tmpdir) { yield self }
     ensure
-      ignore_interrupts { chmod_rm_rf(tmpdir) } unless retain?
+      ignore_interrupts { chmod_rm_rf(@tmpdir) } unless retain?
     end
   ensure
     ohai "Temporary files retained at:", @tmpdir.to_s if retain? && !@tmpdir.nil? && !@quiet
@@ -70,6 +75,7 @@ class Mktemp
 
   private
 
+  sig { params(path: Pathname).void }
   def chmod_rm_rf(path)
     if path.directory? && !path.symlink?
       chmod("u+rw", path) if path.owned? # Need permissions in order to see the contents

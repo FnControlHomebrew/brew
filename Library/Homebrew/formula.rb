@@ -167,7 +167,7 @@ class Formula
   # {.option}s in the {Formula}. Note that these may differ at different times
   # during the installation of a {Formula}. This is annoying but the result of
   # state that we're trying to eliminate.
-  # @return [BuildOptions]
+  sig { returns(T.any(BuildOptions, Tab)) }
   attr_reader :build
 
   # Whether this formula should be considered outdated
@@ -292,6 +292,7 @@ class Formula
   # Can differ from {#alias_path}, which is the alias used to find the formula,
   # and is specified to this instance.
   def installed_alias_path
+    build = self.build
     path = build.source["path"] if build.is_a?(Tab)
     return unless path&.match?(%r{#{HOMEBREW_TAP_DIR_REGEX}/Aliases}o)
     return unless File.symlink?(path)
@@ -576,7 +577,7 @@ class Formula
     tab = Tab.for_keg(prefix(version))
 
     return true if tab.version_scheme < version_scheme
-    return true if stable && tab.stable_version && tab.stable_version < stable.version
+    return true if stable && (tab_version = tab.stable_version) && tab_version < stable.version
     return false unless fetch_head
     return false unless head&.downloader.is_a?(VCSDownloadStrategy)
 
@@ -1843,6 +1844,7 @@ class Formula
 
   # Returns a list of Dependency objects that are required at runtime.
   # @private
+  sig { params(read_from_tab: T::Boolean, undeclared: T::Boolean).returns(T::Array[Dependency]) }
   def runtime_dependencies(read_from_tab: true, undeclared: true)
     deps = if read_from_tab && undeclared &&
               (tab_deps = any_installed_keg&.runtime_dependencies)

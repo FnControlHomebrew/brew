@@ -23,12 +23,18 @@ class Module
 end
 
 class Pathname
-  # https://github.com/sorbet/sorbet/pull/4660
+  # https://github.com/sorbet/sorbet/issues/4688
   sig do
-    params(
-        consider_symlink: T::Boolean,
+    type_parameters(:U).params(
+        ignore_error: T::Boolean,
+        blk: T.proc.params(arg0: Pathname).returns(T.type_parameter(:U)),
     )
-    .returns(Pathname)
+    .returns(T.type_parameter(:U))
   end
-  def cleanpath(consider_symlink=T.unsafe(nil)); end
+  # sig {params(ignore_error: T::Boolean).returns(T::Enumerator[Pathname])}
+  def find(ignore_error: true, &blk); end
+
+  # https://github.com/sorbet/sorbet/pull/4686
+  sig {returns(Pathname)}
+  def readlink(); end
 end

@@ -12,7 +12,7 @@ module EnvMethods
   sig { params(key: String).returns(String) }
   def fetch(key); end
 
-  sig { params(key: String, value: T.nilable(T.any(String, PATH))).returns(T.nilable(String)) }
+  sig { params(key: String, value: T.nilable(T.any(String, Pathname, PATH))).returns(T.nilable(String)) }
   def []=(key, value); end
 
   sig { params(block: T.proc.params(arg0: [String, String]).returns(T::Boolean)).returns(T::Hash[String, String]) }

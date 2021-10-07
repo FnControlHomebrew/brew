@@ -1,7 +1,10 @@
-# typed: true
+# typed: strict
 # frozen_string_literal: true
 
 class Keg
+  extend T::Sig
+
+  sig { params(id: String, file: Pathname).void }
   def change_dylib_id(id, file)
     return if file.dylib_id == id
 
@@ -18,6 +21,7 @@ class Keg
     raise
   end
 
+  sig { params(old: String, new: String, file: Pathname).void }
   def change_install_name(old, new, file)
     return if old == new
 
@@ -34,7 +38,8 @@ class Keg
     raise
   end
 
-  def change_rpath(old, new, file)
+  sig { params(old: String, new: String, file: Pathname).void }
+  def change_macos_rpath(old, new, file)
     return if old == new
 
     @require_relocation = true
@@ -50,6 +55,7 @@ class Keg
     raise
   end
 
+  sig { params(rpath: String, file: Pathname).void }
   def delete_rpath(rpath, file)
     odebug "Deleting rpath #{rpath} in #{file}"
     MachO::Tools.delete_rpath(file, rpath, strict: false)
@@ -61,6 +67,7 @@ class Keg
     raise
   end
 
+  sig { params(file: Pathname).void }
   def apply_ad_hoc_signature(file)
     return if MacOS.version < :big_sur
     return unless Hardware::CPU.arm?

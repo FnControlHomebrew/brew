@@ -1,4 +1,4 @@
-# typed: false
+# typed: strict
 # frozen_string_literal: true
 
 require "delegate"
@@ -10,28 +10,37 @@ require "cask_dependent"
 class Dependencies < SimpleDelegator
   extend T::Sig
 
+  sig { params(args: Dependency).void }
   def initialize(*args)
     super(args)
   end
 
-  alias eql? ==
+  sig { params(other: BasicObject).returns(T::Boolean) }
+  def eql?(other)
+    self == other
+  end
 
+  sig { returns(T::Array[Dependency]) }
   def optional
     select(&:optional?)
   end
 
+  sig { returns(T::Array[Dependency]) }
   def recommended
     select(&:recommended?)
   end
 
+  sig { returns(T::Array[Dependency]) }
   def build
     select(&:build?)
   end
 
+  sig { returns(T::Array[Dependency]) }
   def required
     select(&:required?)
   end
 
+  sig { returns(T::Array[Dependency]) }
   def default
     build + required + recommended
   end
@@ -48,14 +57,16 @@ end
 class Requirements < SimpleDelegator
   extend T::Sig
 
+  sig { params(args: Requirement).void }
   def initialize(*args)
     super(Set.new(args))
   end
 
+  sig { params(other: Requirement).returns(T.self_type) }
   def <<(other)
     if other.is_a?(Comparable)
       grep(other.class) do |req|
-        return self if req > other
+        return self if T.cast(req, Comparable) > other
 
         delete(req)
       end

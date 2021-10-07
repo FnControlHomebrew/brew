@@ -39,6 +39,7 @@ module OS
       # This returns the version number of XQuartz, not of the upstream X.org.
       # The X11.app distributed by Apple is also XQuartz, and therefore covered
       # by this method.
+      sig { returns(::Version) }
       def version
         if @version ||= detect_version
           ::Version.new @version
@@ -47,6 +48,7 @@ module OS
         end
       end
 
+      sig { returns(T.any(::Version, T.nilable(String))) }
       def detect_version
         if (path = bundle_path) && path.exist? && (version = version_from_mdls(path))
           version
@@ -68,6 +70,7 @@ module OS
         "2.7.11"
       end
 
+      sig { returns(T.nilable(Pathname)) }
       def bundle_path
         # Use the default location if it exists.
         return DEFAULT_BUNDLE_PATH if DEFAULT_BUNDLE_PATH.exist?
@@ -77,6 +80,7 @@ module OS
         MacOS.app_with_bundle_id(NEW_BUNDLE_PKG_ID, FORGE_BUNDLE_ID)
       end
 
+      sig { params(path: Pathname).returns(T.nilable(String)) }
       def version_from_mdls(path)
         version = Utils.popen_read(
           "/usr/bin/mdls", "-raw", "-nullMarker", "", "-name", "kMDItemVersion", path.to_s
@@ -86,6 +90,7 @@ module OS
 
       # Upstream XQuartz *does* have a pkg-info entry, so if we can't get it
       # from mdls, we can try pkgutil. This is very slow.
+      sig { returns(T.nilable(String)) }
       def version_from_pkgutil
         [NEW_BUNDLE_PKG_ID, FORGE_PKG_ID].each do |id|
           str = MacOS.pkgutil_info(id)[/version: (\d\.\d\.\d+)$/, 1]
@@ -95,34 +100,41 @@ module OS
         nil
       end
 
+      sig { returns(T.nilable(Pathname)) }
       def prefix
         @prefix ||= Pathname.new("/opt/X11") if Pathname.new("/opt/X11/lib/libpng.dylib").exist?
       end
 
+      sig { returns(T::Boolean) }
       def installed?
         !version.null? && !prefix.nil?
       end
 
+      sig { returns(T::Boolean) }
       def outdated?
         return false unless installed?
 
         version < latest_version
       end
 
+      sig { returns(T.nilable(Pathname)) }
       def bin
-        prefix/"bin"
+        prefix&.yield_self { |prefix| prefix/"bin" }
       end
 
+      sig { returns(T.nilable(Pathname)) }
       def include
-        prefix/"include"
+        prefix&.yield_self { |prefix| prefix/"include" }
       end
 
+      sig { returns(T.nilable(Pathname)) }
       def lib
-        prefix/"lib"
+        prefix&.yield_self { |prefix| prefix/"lib" }
       end
 
+      sig { returns(T.nilable(Pathname)) }
       def share
-        prefix/"share"
+        prefix&.yield_self { |prefix| prefix/"share" }
       end
     end
   end

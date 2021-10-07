@@ -293,6 +293,21 @@ module Homebrew
 
       sig { returns(T::Boolean) }
       def write_only?; end
+
+      sig { returns(T.nilable(String)) }
+      def env; end
+
+      sig { returns(T.nilable(String)) }
+      def cc; end
+
+      sig { returns(T.nilable(String)) }
+      def bottle_arch; end
+
+      sig { returns(T::Boolean) }
+      def interactive?; end
+
+      sig { returns(T::Boolean) }
+      def git?; end
     end
   end
 end

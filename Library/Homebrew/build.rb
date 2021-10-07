@@ -1,4 +1,4 @@
-# typed: false
+# typed: strict
 # frozen_string_literal: true
 
 # This script is loaded by formula_installer as a separate instance.
@@ -19,28 +19,43 @@ require "cmd/install"
 #
 # @api private
 class Build
-  attr_reader :formula, :deps, :reqs, :args
+  extend T::Sig
 
+  sig { returns(Formula) }
+  attr_reader :formula
+
+  sig { returns(T::Array[Dependency]) }
+  attr_reader :deps
+
+  sig { returns(Requirements) }
+  attr_reader :reqs
+
+  sig { returns(Homebrew::CLI::Args) }
+  attr_reader :args
+
+  sig { params(formula: Formula, options: Options, args: Homebrew::CLI::Args).void }
   def initialize(formula, options, args:)
     @formula = formula
     @formula.build = BuildOptions.new(options, formula.options)
     @args = args
 
     if args.ignore_dependencies?
-      @deps = []
-      @reqs = []
+      @deps = T.let([], T::Array[Dependency])
+      @reqs = T.let(Requirements.new, Requirements)
     else
       @deps = expand_deps
       @reqs = expand_reqs
     end
   end
 
+  sig { params(dependent: Formula).returns(BuildOptions) }
   def effective_build_options_for(dependent)
     args  = dependent.build.used_options
     args |= Tab.for_formula(dependent).used_options
     BuildOptions.new(args, dependent.options)
   end
 
+  sig { returns(Requirements) }
   def expand_reqs
     formula.recursive_requirements do |dependent, req|
       build = effective_build_options_for(dependent)
@@ -50,6 +65,7 @@ class Build
     end
   end
 
+  sig { returns(T::Array[Dependency]) }
   def expand_deps
     formula.recursive_dependencies do |dependent, dep|
       build = effective_build_options_for(dependent)
@@ -63,6 +79,7 @@ class Build
     end
   end
 
+  sig { void }
   def install
     formula_deps = deps.map(&:to_formula)
     keg_only_deps = formula_deps.select(&:keg_only?)
@@ -180,6 +197,7 @@ class Build
     end
   end
 
+  sig { returns(T::Array[Symbol]) }
   def detect_stdlibs
     keg = Keg.new(formula.prefix)
 
@@ -189,13 +207,14 @@ class Build
     keg.detect_cxx_stdlibs(skip_executables: true)
   end
 
+  sig { params(f: Formula).void }
   def fixopt(f)
     path = if f.linked_keg.directory? && f.linked_keg.symlink?
       f.linked_keg.resolved_path
     elsif f.prefix.directory?
       f.prefix
-    elsif (kids = f.rack.children).size == 1 && kids.first.directory?
-      kids.first
+    elsif (kids = f.rack.children).size == 1 && T.must(child = kids.first).directory?
+      child
     else
       raise
     end
@@ -226,12 +245,12 @@ rescue Exception => e # rubocop:disable Lint/RescueException
   # BuildErrors are specific to build processes and not other
   # children, which is why we create the necessary state here
   # and not in Utils.safe_fork.
-  case error_hash["json_class"]
-  when "BuildError"
+  case e
+  when BuildError
     error_hash["cmd"] = e.cmd
     error_hash["args"] = e.args
     error_hash["env"] = e.env
-  when "ErrorDuringExecution"
+  when ErrorDuringExecution
     error_hash["cmd"] = e.cmd
     error_hash["status"] = if e.status.is_a?(Process::Status)
       {

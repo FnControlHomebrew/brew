@@ -11,8 +11,10 @@ class ArchRequirement < Requirement
 
   fatal true
 
+  sig { returns(Symbol) }
   attr_reader :arch
 
+  sig { params(tags: [Symbol]).void }
   def initialize(tags)
     @arch = tags.shift
     super(tags)

@@ -1,4 +1,4 @@
-# typed: true
+# typed: strict
 # frozen_string_literal: true
 
 module Superenv
@@ -6,16 +6,27 @@ module Superenv
 
   # The location of Homebrew's shims on Linux.
   # @public
+  sig { returns(Pathname) }
   def self.shims_path
     HOMEBREW_SHIMS_PATH/"linux/super"
   end
 
   # @private
+  sig { returns(Pathname) }
   def self.bin
     shims_path.realpath
   end
 
   # @private
+  sig {
+    params(
+      formula:         T.nilable(Formula),
+      cc:              T.nilable(String),
+      build_bottle:    T.nilable(T::Boolean),
+      bottle_arch:     T.nilable(String),
+      testing_formula: T::Boolean,
+    ).void
+  }
   def setup_build_environment(formula: nil, cc: nil, build_bottle: false, bottle_arch: nil, testing_formula: false)
     generic_setup_build_environment(
       formula: formula, cc: cc, build_bottle: build_bottle,
@@ -23,10 +34,11 @@ module Superenv
     )
     self["HOMEBREW_OPTIMIZATION_LEVEL"] = "O2"
     self["HOMEBREW_DYNAMIC_LINKER"] = determine_dynamic_linker_path
-    self["HOMEBREW_RPATH_PATHS"] = determine_rpath_paths(@formula)
+    self["HOMEBREW_RPATH_PATHS"] = determine_rpath_paths(formula)
     self["M4"] = "#{HOMEBREW_PREFIX}/opt/m4/bin/m4" if deps.any? { |d| d.name == "libtool" || d.name == "bison" }
   end
 
+  sig { returns(T::Array[Pathname]) }
   def homebrew_extra_paths
     paths = []
     paths += %w[binutils make].map do |f|
@@ -38,6 +50,7 @@ module Superenv
     paths
   end
 
+  sig { params(formula: T.nilable(Formula)).returns(PATH) }
   def determine_rpath_paths(formula)
     PATH.new(
       *formula&.lib,

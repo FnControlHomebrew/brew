@@ -17,11 +17,19 @@ class Requirement
   include Dependable
   extend Cachable
 
-  attr_reader :tags, :name, :cask, :download
+  sig { override.returns(Array) }
+  attr_reader :tags
 
+  sig { returns(T.nilable(String)) }
+  attr_reader :cask
+
+  sig { returns(T.nilable(String)) }
+  attr_reader :download
+
+  sig { params(tags: T::Array[T.untyped]).void }
   def initialize(tags = [])
-    @cask = self.class.cask
-    @download = self.class.download
+    @cask = T.let(self.class.cask, T.nilable(String))
+    @download = T.let(self.class.download, T.nilable(String))
     tags.each do |tag|
       next unless tag.is_a? Hash
 
@@ -30,9 +38,15 @@ class Requirement
     end
     @tags = tags
     @tags << :build if self.class.build
+  end
+
+  sig { returns(String) }
+  def name
+    @name = T.let(@name, T.nilable(String))
     @name ||= infer_name
   end
 
+  sig { override.returns(T::Array[String]) }
   def option_names
     [name]
   end
@@ -60,6 +74,14 @@ class Requirement
 
   # Overriding {#satisfied?} is unsupported.
   # Pass a block or boolean to the satisfy DSL method instead.
+  sig {
+    params(
+      env:          T.nilable(String),
+      cc:           T.nilable(String),
+      build_bottle: T::Boolean,
+      bottle_arch:  T.nilable(String),
+    ).returns(T::Boolean)
+  }
   def satisfied?(env: nil, cc: nil, build_bottle: false, bottle_arch: nil)
     satisfy = self.class.satisfy
     return true unless satisfy
@@ -75,10 +97,12 @@ class Requirement
 
   # Overriding {#fatal?} is unsupported.
   # Pass a boolean to the fatal DSL method instead.
+  sig { returns(T::Boolean) }
   def fatal?
     self.class.fatal || false
   end
 
+  sig { returns(T.nilable(Pathname)) }
   def satisfied_result_parent
     return unless @satisfied_result.is_a?(Pathname)
 
@@ -91,9 +115,17 @@ class Requirement
 
   # Overriding {#modify_build_environment} is unsupported.
   # Pass a block to the env DSL method instead.
+  sig {
+    params(
+      env:          T.nilable(String),
+      cc:           T.nilable(String),
+      build_bottle: T::Boolean,
+      bottle_arch:  T.nilable(String),
+    ).void
+  }
   def modify_build_environment(env: nil, cc: nil, build_bottle: false, bottle_arch: nil)
     satisfied?(env: env, cc: cc, build_bottle: build_bottle, bottle_arch: bottle_arch)
-    instance_eval(&env_proc) if env_proc
+    env_proc&.yield_self { |env_proc| instance_eval(&env_proc) }
 
     # XXX If the satisfy block returns a Pathname, then make sure that it
     # remains available on the PATH. This makes requirements like
@@ -112,15 +144,18 @@ class Requirement
     self.class.env
   end
 
+  sig { returns(T.nilable(Proc)) }
   def env_proc
     self.class.env_proc
   end
 
+  sig { params(other: Object).returns(T::Boolean) }
   def ==(other)
-    instance_of?(other.class) && name == other.name && tags == other.tags
+    other.is_a?(self.class) && name == other.name && tags == other.tags
   end
   alias eql? ==
 
+  sig { returns(Integer) }
   def hash
     name.hash ^ tags.hash
   end
@@ -130,16 +165,23 @@ class Requirement
     "#<#{self.class.name}: #{tags.inspect}>"
   end
 
+  sig { returns(String) }
   def display_s
     name.capitalize
   end
 
+  sig {
+    type_parameters(:U).params(
+      block: T.proc.params(mktemp: Mktemp).returns(T.type_parameter(:U))
+    ).returns(T.type_parameter(:U))
+  }
   def mktemp(&block)
     Mktemp.new(name).run(&block)
   end
 
   private
 
+  sig { returns(String) }
   def infer_name
     klass = self.class.name || self.class.to_s
     klass = klass.sub(/(Dependency|Requirement)$/, "")
@@ -164,11 +206,24 @@ class Requirement
 
     include BuildEnvironment::DSL
 
-    attr_reader :env_proc, :build
+    sig { returns(T.nilable(Proc)) }
+    attr_reader :env_proc
 
-    attr_rw :fatal, :cask, :download
+    sig { returns(T.nilable(T::Boolean)) }
+    attr_reader :build
 
+    # sig { returns(T.nilable(T::Boolean)) }
+    attr_rw :fatal
+
+    # sig { returns(T.nilable(String)) }
+    attr_rw :cask
+
+    # sig { returns(T.nilable(String)) }
+    attr_rw :download
+
+    sig { params(options: T.nilable(T.any(Hash, T::Boolean, Pathname)), block: T.nilable(Proc)).returns(T.nilable(Satisfier)) }
     def satisfy(options = nil, &block)
+      @satisifed = T.let(@satisfied, T.nilable(Satisfier))
       return @satisfied if options.nil? && !block
 
       options = {} if options.nil?
@@ -186,18 +241,31 @@ class Requirement
 
   # Helper class for evaluating whether a requirement is satisfied.
   class Satisfier
+    extend T::Sig
+
+    sig { params(options: T.any(Hash, T::Boolean, Pathname), block: T.nilable(Proc)).void }
     def initialize(options, &block)
       case options
       when Hash
         @options = { build_env: true }
         @options.merge!(options)
+        # TODO: raise an error if no block is given?
       else
         @satisfied = options
       end
       @proc = block
     end
 
-    def yielder(env: nil, cc: nil, build_bottle: false, bottle_arch: nil)
+    sig {
+      params(
+        env:          T.nilable(String),
+        cc:           T.nilable(String),
+        build_bottle: T::Boolean,
+        bottle_arch:  T.nilable(String),
+        _block:       T.proc.params(p: Proc).returns(T::Boolean),
+      ).returns(T.any(T::Boolean, Pathname))
+    }
+    def yielder(env: nil, cc: nil, build_bottle: false, bottle_arch: nil, &_block)
       if instance_variable_defined?(:@satisfied)
         @satisfied
       elsif @options[:build_env]
@@ -205,10 +273,10 @@ class Requirement
         ENV.with_build_environment(
           env: env, cc: cc, build_bottle: build_bottle, bottle_arch: bottle_arch,
         ) do
-          yield @proc
+          yield T.must(@proc)
         end
       else
-        yield @proc
+        yield T.must(@proc)
       end
     end
   end
@@ -220,6 +288,15 @@ class Requirement
     # the list.
     # The default filter, which is applied when a block is not given, omits
     # optionals and recommendeds based on what the dependent has asked for.
+    sig {
+      params(
+        dependent: T.any(Formula, CaskDependent, SoftwareSpec),
+        cache_key: T.nilable(String),
+        block:     T.nilable(
+          T.proc.params(dependent: T.any(Formula, CaskDependent, SoftwareSpec), req: Requirement).void,
+        ),
+      ).returns(Requirements)
+    }
     def expand(dependent, cache_key: nil, &block)
       if cache_key.present?
         cache[cache_key] ||= {}
@@ -243,11 +320,22 @@ class Requirement
       reqs
     end
 
+    sig {
+      params(
+        dependent: T.any(Formula, CaskDependent, SoftwareSpec),
+        req:       Requirement,
+        block:     T.nilable(
+          T.proc.params(dependent: T.any(Formula, CaskDependent, SoftwareSpec), req: Requirement).void,
+        ),
+      ).returns(T.nilable(T::Boolean))
+    }
     def prune?(dependent, req, &block)
       catch(:prune) do
         if block
           yield dependent, req
+          nil
         elsif req.optional? || req.recommended?
+          dependent = T.cast(dependent, T.any(Formula, SoftwareSpec))
           prune unless dependent.build.with?(req)
         end
       end

@@ -34,9 +34,9 @@ describe Dependency do
 
   describe "::merge_repeats" do
     it "merges duplicate dependencies" do
-      dep = described_class.new("foo", [:build], nil, "foo")
-      dep2 = described_class.new("foo", ["bar"], nil, "foo2")
-      dep3 = described_class.new("xyz", ["abc"], nil, "foo")
+      dep = described_class.new("foo", [:build], nil, ["foo"])
+      dep2 = described_class.new("foo", ["bar"], nil, ["foo2"])
+      dep3 = described_class.new("xyz", ["abc"], nil, ["foo"])
       merged = described_class.merge_repeats([dep, dep2, dep3])
       expect(merged.count).to eq(2)
       expect(merged.first).to be_a described_class

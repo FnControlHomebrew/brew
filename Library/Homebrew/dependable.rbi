@@ -1,5 +1,5 @@
 # typed: strict
 
 module Dependable
-  def tags; end
+  include Kernel
 end

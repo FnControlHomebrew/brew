@@ -32,13 +32,13 @@ module EnvActivation
   end
 
   sig {
-    params(
+    type_parameters(:R).params(
       env:          T.nilable(String),
       cc:           T.nilable(String),
       build_bottle: T::Boolean,
       bottle_arch:  T.nilable(String),
-      _block:       T.proc.returns(T.untyped),
-    ).returns(T.untyped)
+      _block:       T.proc.returns(T.type_parameter(:R)),
+    ).returns(T.type_parameter(:R))
   }
   def with_build_environment(env: nil, cc: nil, build_bottle: false, bottle_arch: nil, &_block)
     old_env = to_hash.dup

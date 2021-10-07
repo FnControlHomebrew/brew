@@ -1,9 +1,10 @@
-# typed: true
+# typed: strict
 # frozen_string_literal: true
 
 require "compilers"
 
 class Keg
+  sig { params(relocation: Relocation).void }
   def relocate_dynamic_linkage(relocation)
     # Patching the dynamic linker of glibc breaks it.
     return if name == "glibc"
@@ -15,12 +16,13 @@ class Keg
 
     elf_files.each do |file|
       file.ensure_writable do
-        change_rpath(file, old_prefix, new_prefix)
+        change_linux_rpath(file, old_prefix, new_prefix)
       end
     end
   end
 
-  def change_rpath(file, old_prefix, new_prefix)
+  sig { params(file: Pathname, old_prefix: T.any(String, Regexp), new_prefix: String).void }
+  def change_linux_rpath(file, old_prefix, new_prefix)
     return if !file.elf? || !file.dynamic_elf?
 
     updated = {}
@@ -50,6 +52,7 @@ class Keg
     file.patch!(interpreter: updated[:interpreter], rpath: updated[:rpath])
   end
 
+  sig { params(options: T::Hash[Symbol, T::Boolean]).returns(T::Array[Symbol]) }
   def detect_cxx_stdlibs(options = {})
     skip_executables = options.fetch(:skip_executables, false)
     results = Set.new
@@ -64,6 +67,7 @@ class Keg
     results.to_a
   end
 
+  sig { returns(T::Array[Pathname]) }
   def elf_files
     hardlinks = Set.new
     elf_files = []
@@ -81,7 +85,9 @@ class Keg
     elf_files
   end
 
+  sig { returns(T::Array[String]) }
   def self.relocation_formulae
+    @relocation_formulae = T.let(@relocation_formulae, T.nilable(T::Array[String]))
     @relocation_formulae ||= if HOMEBREW_PATCHELF_RB_WRITE
       []
     else
@@ -89,7 +95,9 @@ class Keg
     end.freeze
   end
 
+  sig { returns(T::Array[String]) }
   def self.bottle_dependencies
+    @bottle_dependencies = T.let(@bottle_dependencies, T.nilable(T::Array[String]))
     @bottle_dependencies ||= begin
       formulae = relocation_formulae
       gcc = Formulary.factory(CompilerSelector.preferred_gcc)

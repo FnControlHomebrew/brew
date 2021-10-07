@@ -1,4 +1,4 @@
-# typed: false
+# typed: true
 # frozen_string_literal: true
 
 require "dependable"
@@ -13,7 +13,17 @@ class Dependency
   include Dependable
   extend Cachable
 
-  attr_reader :name, :tags, :env_proc, :option_names
+  sig { returns(String) }
+  attr_reader :name
+
+  sig { override.returns(Array) }
+  attr_reader :tags
+
+  sig { returns(T.nilable(Proc)) }
+  attr_reader :env_proc
+
+  sig { override.returns(T::Array[String]) }
+  attr_reader :option_names
 
   DEFAULT_ENV_PROC = proc {}.freeze
   private_constant :DEFAULT_ENV_PROC
@@ -87,7 +97,7 @@ class Dependency
   end
 
   def self._load(marshaled)
-    new(*Marshal.load(marshaled)) # rubocop:disable Security/MarshalLoad
+    T.unsafe(self).new(*Marshal.load(marshaled)) # rubocop:disable Security/MarshalLoad
   end
 
   class << self
@@ -98,6 +108,15 @@ class Dependency
     # the list.
     # The default filter, which is applied when a block is not given, omits
     # optionals and recommendeds based on what the dependent has asked for
+    sig {
+      params(
+        dependent:      T.any(Formula, CaskDependent),
+        deps:           T.any(Dependencies, T::Array[Dependency]),
+        cache_key:      T.nilable(String),
+        ignore_missing: T::Boolean,
+        block:          T.nilable(T.proc.params(dependent: T.any(Formula, CaskDependent), dep: Dependency).void),
+      ).returns(T::Array[Dependency])
+    }
     def expand(dependent, deps = dependent.deps, cache_key: nil, ignore_missing: false, &block)
       # Keep track dependencies to avoid infinite cyclic dependency recursion.
       @expand_stack ||= []
@@ -137,13 +156,23 @@ class Dependency
       @expand_stack.pop
     end
 
+    sig {
+      params(
+        dependent:      T.any(Formula, CaskDependent),
+        dep:            Dependency,
+        ignore_missing: T::Boolean,
+        block:          T.nilable(T.proc.params(dependent: T.any(Formula, CaskDependent), dep: Dependency).void),
+      ).returns(T.nilable(Symbol))
+    }
     def action(dependent, dep, ignore_missing: false, &block)
       catch(:action) do
         prune if ignore_missing && dep.unavailable_core_formula?
 
         if block
           yield dependent, dep
+          nil
         elsif dep.optional? || dep.recommended?
+          dependent = T.cast(dependent, Formula)
           prune unless dependent.build.with?(dep)
         end
       end

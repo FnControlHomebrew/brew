@@ -1,4 +1,4 @@
-# typed: false
+# typed: strict
 # frozen_string_literal: true
 
 require "cxxstdlib"
@@ -19,6 +19,7 @@ class Tab < OpenStruct
   FILENAME = "INSTALL_RECEIPT.json"
 
   # Instantiates a Tab for a new installation of a formula.
+  sig { params(formula: Formula, compiler: T.any(Symbol, String), stdlib: T.nilable(Symbol)).returns(Tab) }
   def self.create(formula, compiler, stdlib)
     build = formula.build
     runtime_deps = formula.runtime_dependencies(undeclared: false)
@@ -60,6 +61,7 @@ class Tab < OpenStruct
 
   # Returns the {Tab} for an install receipt at `path`.
   # Results are cached.
+  sig { params(path: T.any(String, Pathname)).returns(Tab) }
   def self.from_file(path)
     cache.fetch(path) do |p|
       content = File.read(p)
@@ -70,6 +72,7 @@ class Tab < OpenStruct
   end
 
   # Like {from_file}, but bypass the cache.
+  sig { params(content: String, path: T.any(String, Pathname)).returns(Tab) }
   def self.from_file_content(content, path)
     attributes = begin
       JSON.parse(content)
@@ -110,6 +113,7 @@ class Tab < OpenStruct
     new(attributes)
   end
 
+  sig { params(keg: T.any(Keg, Pathname)).returns(Tab) }
   def self.for_keg(keg)
     path = keg/FILENAME
 
@@ -125,10 +129,12 @@ class Tab < OpenStruct
 
   # Returns a {Tab} for the named formula's installation,
   # or a fake one if the formula is not installed.
+  sig { params(name: String).returns(Tab) }
   def self.for_name(name)
     for_formula(Formulary.factory(name))
   end
 
+  sig { params(deprecated_options: T::Array[DeprecatedOption], options: Options).returns(Options) }
   def self.remap_deprecated_options(deprecated_options, options)
     deprecated_options.each do |deprecated_option|
       option = options.find { |o| o.name == deprecated_option.old }
@@ -142,6 +148,7 @@ class Tab < OpenStruct
 
   # Returns a {Tab} for an already installed formula,
   # or a fake one if the formula is not installed.
+  sig { params(f: Formula).returns(Tab) }
   def self.for_formula(f)
     paths = []
 
@@ -180,6 +187,7 @@ class Tab < OpenStruct
     tab
   end
 
+  sig { returns(Tab) }
   def self.empty
     attributes = {
       "homebrew_version"        => HOMEBREW_VERSION,
@@ -213,6 +221,7 @@ class Tab < OpenStruct
     new(attributes)
   end
 
+  sig { params(formula: Formula, deps: T::Array[Dependency]).returns(T::Array[T::Hash[String, T.untyped]]) }
   def self.runtime_deps_hash(formula, deps)
     deps.map do |dep|
       f = dep.to_formula
@@ -224,98 +233,119 @@ class Tab < OpenStruct
     end
   end
 
+  sig { returns(T::Boolean) }
   def any_args_or_options?
     !used_options.empty? || !unused_options.empty?
   end
 
+  sig { params(val: T.any(Dependable, String)).returns(T::Boolean) }
   def with?(val)
-    option_names = val.respond_to?(:option_names) ? val.option_names : [val]
+    option_names = val.is_a?(Dependable) ? val.option_names : [val]
 
     option_names.any? do |name|
       include?("with-#{name}") || unused_options.include?("without-#{name}")
     end
   end
 
+  sig { params(val: T.any(Dependency, Requirement, String)).returns(T::Boolean) }
   def without?(val)
     !with?(val)
   end
 
+  sig { params(opt: String).returns(T::Boolean) }
   def include?(opt)
     used_options.include? opt
   end
 
+  sig { returns(T::Boolean) }
   def head?
     spec == :head
   end
 
+  sig { returns(T::Boolean) }
   def stable?
     spec == :stable
   end
 
+  sig { returns(Options) }
   def used_options
     Options.create(super)
   end
 
+  sig { returns(Options) }
   def unused_options
     Options.create(super)
   end
 
+  sig { returns(T.any(String, Symbol)) }
   def compiler
     super || DevelopmentTools.default_compiler
   end
 
+  sig { returns(Version) }
   def parsed_homebrew_version
     return Version::NULL if homebrew_version.nil?
 
     Version.new(homebrew_version)
   end
 
+  sig { returns(T.nilable(T::Array[T::Hash[String, T.untyped]])) }
   def runtime_dependencies
     # Homebrew versions prior to 1.1.6 generated incorrect runtime dependency
     # lists.
     super unless parsed_homebrew_version < "1.1.6"
   end
 
+  sig { returns(CxxStdlib) }
   def cxxstdlib
     # Older tabs won't have these values, so provide sensible defaults
-    lib = stdlib.to_sym if stdlib
+    lib = stdlib&.to_sym
     CxxStdlib.create(lib, compiler.to_sym)
   end
 
+  sig { returns(T::Boolean) }
   def built_bottle?
     built_as_bottle && !poured_from_bottle
   end
 
+  sig { returns(T::Boolean) }
   def bottle?
     built_as_bottle
   end
 
+  sig { returns(T.nilable(Tap)) }
   def tap
     tap_name = source["tap"]
     Tap.fetch(tap_name) if tap_name
   end
 
+  sig { params(tap: T.nilable(T.any(Tap, String))).void }
   def tap=(tap)
-    tap_name = tap.respond_to?(:name) ? tap.name : tap
+    tap_name = tap.is_a?(Tap) ? tap.name : tap
     source["tap"] = tap_name
   end
 
+  sig { returns(Symbol) }
   def spec
     source["spec"].to_sym
   end
 
+  sig { returns(T::Hash[String, T.untyped]) }
   def versions
     source["versions"]
   end
 
+  sig { returns(T.nilable(Version)) }
   def stable_version
     Version.create(versions["stable"]) if versions["stable"]
   end
 
+  sig { returns(T.nilable(Version)) }
   def head_version
     Version.create(versions["head"]) if versions["head"]
   end
 
+  sig { returns(Integer) }
   def version_scheme
     versions["version_scheme"] || 0
   end
@@ -325,6 +355,7 @@ class Tab < OpenStruct
     Time.at(super || 0)
   end
 
+  sig { params(options: T.nilable(T::Hash[Symbol, T.untyped])).returns(String) }
   def to_json(options = nil)
     attributes = {
       "homebrew_version"        => homebrew_version,
@@ -338,7 +369,7 @@ class Tab < OpenStruct
       "time"                    => time,
       "source_modified_time"    => source_modified_time.to_i,
       "stdlib"                  => stdlib&.to_s,
-      "compiler"                => compiler&.to_s,
+      "compiler"                => compiler.to_s,
       "aliases"                 => aliases,
       "runtime_dependencies"    => runtime_dependencies,
       "source"                  => source,
@@ -351,13 +382,14 @@ class Tab < OpenStruct
   end
 
   # a subset of to_json that we care about for bottles
+  sig { returns(T::Hash[String, T.untyped]) }
   def to_bottle_hash
     attributes = {
       "homebrew_version"     => homebrew_version,
       "changed_files"        => changed_files&.map(&:to_s),
       "source_modified_time" => source_modified_time.to_i,
       "stdlib"               => stdlib&.to_s,
-      "compiler"             => compiler&.to_s,
+      "compiler"             => compiler.to_s,
       "runtime_dependencies" => runtime_dependencies,
       "arch"                 => arch,
       "built_on"             => built_on,
@@ -366,6 +398,7 @@ class Tab < OpenStruct
     attributes
   end
 
+  sig { void }
   def write
     # If this is a new installation, the cache of installed formulae
     # will no longer be valid.

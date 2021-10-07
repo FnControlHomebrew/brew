@@ -20,7 +20,12 @@ module Superenv
   include SharedEnvExtension
 
   # @private
-  attr_accessor :keg_only_deps, :deps, :run_time_deps, :x11
+  sig { returns(T::Array[Formula]) }
+  attr_accessor :keg_only_deps, :deps, :run_time_deps
+
+  # @private
+  sig { returns(T.nilable(T::Boolean)) }
+  attr_accessor :x11
 
   sig { params(base: Superenv).void }
   def self.extended(base)
@@ -86,7 +91,7 @@ module Superenv
     self["HOMEBREW_INCLUDE_PATHS"] = determine_include_paths
     self["HOMEBREW_LIBRARY_PATHS"] = determine_library_paths
     self["HOMEBREW_DEPENDENCIES"] = determine_dependencies
-    self["HOMEBREW_FORMULA_PREFIX"] = @formula.prefix unless @formula.nil?
+    self["HOMEBREW_FORMULA_PREFIX"] = formula.prefix unless formula.nil?
 
     # The HOMEBREW_CCCFG ENV variable is used by the ENV/cc tool to control
     # compiler flag stripping. It consists of a string of characters which act
@@ -148,7 +153,7 @@ module Superenv
     path.existing
   end
 
-  sig { returns(T::Array[Pathname]) }
+  sig { returns(T::Array[String]) }
   def homebrew_extra_pkg_config_paths
     []
   end
@@ -168,7 +173,7 @@ module Superenv
     ).existing
   end
 
-  sig { returns(T::Array[Pathname]) }
+  sig { returns(T::Array[String]) }
   def homebrew_extra_aclocal_paths
     []
   end
@@ -182,7 +187,7 @@ module Superenv
     ).existing
   end
 
-  sig { returns(T::Array[Pathname]) }
+  sig { returns(T::Array[String]) }
   def homebrew_extra_isystem_paths
     []
   end
@@ -200,7 +205,7 @@ module Superenv
     PATH.new(keg_only_deps.map(&:opt_include)).existing
   end
 
-  sig { returns(T::Array[Pathname]) }
+  sig { returns(T::Array[String]) }
   def homebrew_extra_library_paths
     []
   end
@@ -241,7 +246,7 @@ module Superenv
     ).existing
   end
 
-  sig { returns(T::Array[Pathname]) }
+  sig { returns(T::Array[String]) }
   def homebrew_extra_cmake_include_paths
     []
   end
@@ -251,7 +256,7 @@ module Superenv
     PATH.new(homebrew_extra_cmake_include_paths).existing
   end
 
-  sig { returns(T::Array[Pathname]) }
+  sig { returns(T::Array[String]) }
   def homebrew_extra_cmake_library_paths
     []
   end
@@ -261,7 +266,7 @@ module Superenv
     PATH.new(homebrew_extra_cmake_library_paths).existing
   end
 
-  sig { returns(T::Array[Pathname]) }
+  sig { returns(T::Array[String]) }
   def homebrew_extra_cmake_frameworks_paths
     []
   end

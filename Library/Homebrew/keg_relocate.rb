@@ -1,7 +1,9 @@
-# typed: false
+# typed: true
 # frozen_string_literal: true
 
 class Keg
+  extend T::Sig
+
   PREFIX_PLACEHOLDER = "@@HOMEBREW_PREFIX@@"
   CELLAR_PLACEHOLDER = "@@HOMEBREW_CELLAR@@"
   REPOSITORY_PLACEHOLDER = "@@HOMEBREW_REPOSITORY@@"
@@ -13,10 +15,12 @@ class Keg
 
     RELOCATABLE_PATH_REGEX_PREFIX = /(?<![a-zA-Z0-9])/.freeze
 
+    sig { void }
     def initialize
-      @replacement_map = {}
+      @replacement_map = T.let({}, T::Hash[Symbol, [T.any(String, Regexp), String]])
     end
 
+    sig { returns(T.self_type) }
     def freeze
       @replacement_map.freeze
       super
@@ -28,12 +32,12 @@ class Keg
       @replacement_map[key] = [old_value, new_value]
     end
 
-    sig { params(key: Symbol).returns(T::Array[T.any(String, Regexp)]) }
+    sig { params(key: Symbol).returns([T.any(String, Regexp), String]) }
     def replacement_pair_for(key)
       @replacement_map.fetch(key)
     end
 
-    sig { params(text: String).void }
+    sig { params(text: String).returns(T::Boolean) }
     def replace_text(text)
       replacements = @replacement_map.values.to_h
 
@@ -41,10 +45,10 @@ class Keg
         key.is_a?(String) ? key.length : 999
       end.reverse
 
-      any_changed = false
+      any_changed = T.let(false, T::Boolean)
       sorted_keys.each do |key|
         changed = text.gsub!(key, replacements[key])
-        any_changed ||= changed
+        any_changed = true if changed
       end
       any_changed
     end
@@ -61,6 +65,7 @@ class Keg
     end
   end
 
+  sig { void }
   def fix_dynamic_linkage
     symlink_files.each do |file|
       link = file.readlink
@@ -78,10 +83,10 @@ class Keg
   end
   alias generic_fix_dynamic_linkage fix_dynamic_linkage
 
-  def relocate_dynamic_linkage(_relocation)
-    []
-  end
+  sig { params(_relocation: Relocation).void }
+  def relocate_dynamic_linkage(_relocation); end
 
+  sig { returns(Relocation) }
   def prepare_relocation_to_placeholders
     relocation = Relocation.new
     relocation.add_replacement_pair(:prefix, HOMEBREW_PREFIX.to_s, PREFIX_PLACEHOLDER, path: true)
@@ -99,12 +104,14 @@ class Keg
   end
   alias generic_prepare_relocation_to_placeholders prepare_relocation_to_placeholders
 
+  sig { returns(T::Array[Pathname]) }
   def replace_locations_with_placeholders
     relocation = prepare_relocation_to_placeholders.freeze
     relocate_dynamic_linkage(relocation)
     replace_text_in_files(relocation)
   end
 
+  sig { returns(Relocation) }
   def prepare_relocation_to_locations
     relocation = Relocation.new
     relocation.add_replacement_pair(:prefix, PREFIX_PLACEHOLDER, HOMEBREW_PREFIX.to_s)
@@ -116,16 +123,18 @@ class Keg
   end
   alias generic_prepare_relocation_to_locations prepare_relocation_to_locations
 
+  sig { params(files: T.nilable(T::Array[Pathname]), skip_linkage: T::Boolean).returns(T::Array[Pathname]) }
   def replace_placeholders_with_locations(files, skip_linkage: false)
     relocation = prepare_relocation_to_locations.freeze
     relocate_dynamic_linkage(relocation) unless skip_linkage
     replace_text_in_files(relocation, files: files)
   end
 
+  sig { params(relocation: Relocation, files: T.nilable(T::Array[Pathname])).returns(T::Array[Pathname]) }
   def replace_text_in_files(relocation, files: nil)
     files ||= text_files | libtool_files
 
-    changed_files = []
+    changed_files = T.let([], T::Array[Pathname])
     files.map(&path.method(:join)).group_by { |f| f.stat.ino }.each_value do |first, *rest|
       s = first.open("rb", &:read)
 
@@ -146,10 +155,12 @@ class Keg
     changed_files
   end
 
+  sig { params(_options: T::Hash[Symbol, T::Boolean]).returns(T::Array[Symbol]) }
   def detect_cxx_stdlibs(_options = {})
     []
   end
 
+  sig { returns(String) }
   def recursive_fgrep_args
     # for GNU grep; overridden for BSD grep on OS X
     "-lr"
@@ -169,14 +180,17 @@ class Keg
     end
   end
 
+  sig { returns(Pathname) }
   def lib
     path/"lib"
   end
 
+  sig { returns(Pathname) }
   def libexec
     path/"libexec"
   end
 
+  sig { returns(T::Array[Pathname]) }
   def text_files
     text_files = []
     return text_files if !which("file") || !which("xargs")
@@ -222,6 +236,7 @@ class Keg
     text_files
   end
 
+  sig { returns(T::Array[Pathname]) }
   def libtool_files
     libtool_files = []
 
@@ -233,6 +248,7 @@ class Keg
     libtool_files
   end
 
+  sig { returns(T::Array[Pathname]) }
   def symlink_files
     symlink_files = []
     path.find do |pn|
@@ -242,6 +258,15 @@ class Keg
     symlink_files
   end
 
+  # sig {
+  #   params(
+  #     file:                           T.untyped
+  #     string:                         T.untyped
+  #     ignores:                        T.untyped
+  #     linked_libraries:               T.untyped
+  #     formula_and_runtime_deps_names: T.untyped
+  #   ).returns(T::Array[[String, String]])
+  # }
   def self.text_matches_in_file(file, string, ignores, linked_libraries, formula_and_runtime_deps_names)
     text_matches = []
     path_regex = Relocation.path_to_regex(string)
@@ -281,14 +306,17 @@ class Keg
     text_matches
   end
 
+  sig { params(_file: Pathname, _string: String).returns(T::Array[String]) }
   def self.file_linked_libraries(_file, _string)
     []
   end
 
+  sig { returns(T::Array[String]) }
   def self.relocation_formulae
     []
   end
 
+  sig { returns(T::Array[String]) }
   def self.bottle_dependencies
     relocation_formulae
   end

@@ -2,9 +2,14 @@
 # frozen_string_literal: true
 
 class Keg
+  extend T::Sig
+
   class << self
+    extend T::Sig
+
     undef file_linked_libraries
 
+    sig { params(file: Pathname, string: String).returns(T::Array[String]) }
     def file_linked_libraries(file, string)
       # Check dynamic library linkage. Importantly, do not perform for static
       # libraries, which will falsely report "linkage" to themselves.
@@ -18,12 +23,13 @@ class Keg
 
   undef relocate_dynamic_linkage
 
+  sig { params(relocation: Relocation).void }
   def relocate_dynamic_linkage(relocation)
     mach_o_files.each do |file|
       file.ensure_writable do
         if file.dylib?
           id = relocated_name_for(file.dylib_id, relocation)
-          change_dylib_id(id, file)
+          change_dylib_id(id, file) if id
         end
 
         each_linkage_for(file, :dynamically_linked_libraries) do |old_name|
@@ -34,13 +40,14 @@ class Keg
         if ENV["HOMEBREW_RELOCATE_RPATHS"]
           each_linkage_for(file, :rpaths) do |old_name|
             new_name = relocated_name_for(old_name, relocation)
-            change_rpath(old_name, new_name, file) if new_name
+            change_macos_rpath(old_name, new_name, file) if new_name
           end
         end
       end
     end
   end
 
+  sig { void }
   def fix_dynamic_linkage
     mach_o_files.each do |file|
       file.ensure_writable do
@@ -72,6 +79,7 @@ class Keg
   # If file is a dylib or bundle itself, look for the dylib named by
   # bad_name relative to the lib directory, so that we can skip the more
   # expensive recursive search if possible.
+  sig { params(file: Pathname, bad_name: String).returns(String) }
   def fixed_name(file, bad_name)
     if bad_name.start_with? PREFIX_PLACEHOLDER
       bad_name.sub(PREFIX_PLACEHOLDER, HOMEBREW_PREFIX)
@@ -91,6 +99,7 @@ class Keg
     end
   end
 
+  sig { params(file: Pathname, linkage_type: Symbol, block: T.proc.params(name: String).void).void }
   def each_linkage_for(file, linkage_type, &block)
     links = file.method(linkage_type)
                 .call
@@ -99,6 +108,7 @@ class Keg
     links.each(&block)
   end
 
+  sig { params(file: Pathname).returns(String) }
   def dylib_id_for(file)
     # The new dylib ID should have the same basename as the old dylib ID, not
     # the basename of the file itself.
@@ -107,6 +117,7 @@ class Keg
     (opt_record/relative_dirname/basename).to_s
   end
 
+  sig { params(old_name: String, relocation: Relocation).returns(T.nilable(String)) }
   def relocated_name_for(old_name, relocation)
     old_prefix, new_prefix = relocation.replacement_pair_for(:prefix)
     old_cellar, new_cellar = relocation.replacement_pair_for(:cellar)
@@ -122,14 +133,16 @@ class Keg
   # `XXX.framework/XXX`, both with or without a slash-delimited prefix.
   FRAMEWORK_RX = %r{(?:^|/)(([^/]+)\.framework/(?:Versions/[^/]+/)?\2)$}.freeze
 
+  sig { params(bad_name: String).returns(String) }
   def find_dylib_suffix_from(bad_name)
     if (framework = bad_name.match(FRAMEWORK_RX))
-      framework[1]
+      T.must(framework[1])
     else
       File.basename(bad_name)
     end
   end
 
+  sig { params(bad_name: String).returns(T.nilable(Pathname)) }
   def find_dylib(bad_name)
     return unless lib.directory?
 
@@ -137,6 +150,7 @@ class Keg
     lib.find { |pn| break pn if pn.to_s.end_with?(suffix) }
   end
 
+  sig { returns(T::Array[Pathname]) }
   def mach_o_files
     hardlinks = Set.new
     mach_o_files = []
@@ -153,6 +167,7 @@ class Keg
     mach_o_files
   end
 
+  sig { returns(Relocation) }
   def prepare_relocation_to_locations
     relocation = generic_prepare_relocation_to_locations
 
@@ -175,6 +190,7 @@ class Keg
     relocation
   end
 
+  sig { returns(String) }
   def recursive_fgrep_args
     # Don't recurse into symlinks; the man page says this is the default, but
     # it's wrong. -O is a BSD-grep-only option.
