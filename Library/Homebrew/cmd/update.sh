@@ -606,7 +606,7 @@ EOS
           GITHUB_API_ENDPOINT="commits/${UPSTREAM_BRANCH_DIR}"
         fi
 
-        # HOMEBREW_CURL is set by brew.sh (and isn't mispelt here)
+        # HOMEBREW_CURL is set by brew.sh (and isn't misspelt here)
         # shellcheck disable=SC2153
         UPSTREAM_SHA_HTTP_CODE="$(
           curl \

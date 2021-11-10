@@ -130,7 +130,7 @@ describe Caveats do
     end
 
     context "when f.service is not nil" do
-      it "prints warning when no service deamon is found" do
+      it "prints warning when no service daemon is found" do
         f = formula do
           url "foo-1.0"
           service do
