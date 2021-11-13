@@ -174,52 +174,87 @@ describe Cask::DSL::Version, :cask do
 
     describe "#dots_to_hyphens" do
       include_examples "version expectations hash", :dots_to_hyphens,
-                       "1.2.3_4-5" => "1-2-3_4-5"
+                       "1.2.3_4-5,6" => "1-2-3_4-5,6"
     end
 
     describe "#dots_to_underscores" do
       include_examples "version expectations hash", :dots_to_underscores,
-                       "1.2.3_4-5" => "1_2_3_4-5"
+                       "1.2.3_4-5,6" => "1_2_3_4-5,6"
+    end
+
+    describe "#dots_to_commas" do
+      include_examples "version expectations hash", :dots_to_commas,
+                       "1.2.3_4-5,6" => "1,2,3_4-5,6"
     end
 
     describe "#hyphens_to_dots" do
       include_examples "version expectations hash", :hyphens_to_dots,
-                       "1.2.3_4-5" => "1.2.3_4.5"
+                       "1.2.3_4-5,6" => "1.2.3_4.5,6"
     end
 
     describe "#hyphens_to_underscores" do
       include_examples "version expectations hash", :hyphens_to_underscores,
-                       "1.2.3_4-5" => "1.2.3_4_5"
+                       "1.2.3_4-5,6" => "1.2.3_4_5,6"
+    end
+
+    describe "#hyphens_to_commas" do
+      include_examples "version expectations hash", :hyphens_to_commas,
+                       "1.2.3_4-5,6" => "1.2.3_4,5,6"
     end
 
     describe "#underscores_to_dots" do
       include_examples "version expectations hash", :underscores_to_dots,
-                       "1.2.3_4-5" => "1.2.3.4-5"
+                       "1.2.3_4-5,6" => "1.2.3.4-5,6"
     end
 
     describe "#underscores_to_hyphens" do
       include_examples "version expectations hash", :underscores_to_hyphens,
-                       "1.2.3_4-5" => "1.2.3-4-5"
+                       "1.2.3_4-5,6" => "1.2.3-4-5,6"
+    end
+
+    describe "#underscores_to_commas" do
+      include_examples "version expectations hash", :underscores_to_commas,
+                       "1.2.3_4-5,6" => "1.2.3,4-5,6"
+    end
+
+    describe "#commas_to_dots" do
+      include_examples "version expectations hash", :commas_to_dots,
+                       "1.2.3_4-5,6" => "1.2.3_4-5.6"
+    end
+
+    describe "#commas_to_hyphens" do
+      include_examples "version expectations hash", :commas_to_hyphens,
+                       "1.2.3_4-5,6" => "1.2.3_4-5-6"
+    end
+
+    describe "#commas_to_underscores" do
+      include_examples "version expectations hash", :commas_to_underscores,
+                       "1.2.3_4-5,6" => "1.2.3_4-5_6"
     end
 
     describe "#no_dots" do
       include_examples "version expectations hash", :no_dots,
-                       "1.2.3_4-5" => "123_4-5"
+                       "1.2.3_4-5,6" => "123_4-5,6"
     end
 
     describe "#no_hyphens" do
       include_examples "version expectations hash", :no_hyphens,
-                       "1.2.3_4-5" => "1.2.3_45"
+                       "1.2.3_4-5,6" => "1.2.3_45,6"
     end
 
     describe "#no_underscores" do
       include_examples "version expectations hash", :no_underscores,
-                       "1.2.3_4-5" => "1.2.34-5"
+                       "1.2.3_4-5,6" => "1.2.34-5,6"
+    end
+
+    describe "#no_commas" do
+      include_examples "version expectations hash", :no_commas,
+                       "1.2.3_4-5,6" => "1.2.3_4-56"
     end
 
     describe "#no_dividers" do
       include_examples "version expectations hash", :no_dividers,
-                       "1.2.3_4-5" => "12345"
+                       "1.2.3_4-5,6" => "123456"
     end
   end
 

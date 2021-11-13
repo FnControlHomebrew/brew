@@ -13,6 +13,7 @@ module Cask
         "." => :dots,
         "-" => :hyphens,
         "_" => :underscores,
+        "," => :commas,
       }.freeze
 
       DIVIDER_REGEX = /(#{DIVIDERS.keys.map { |v| Regexp.quote(v) }.join('|')})/.freeze
