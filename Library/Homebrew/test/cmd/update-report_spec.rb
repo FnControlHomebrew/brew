@@ -87,6 +87,15 @@ describe "brew update-report" do
       expect(hub.select_formula(:R)).to eq([["cv", "progress"]])
     end
 
+    specify "with renamed Cask" do
+      allow(tap).to receive(:cask_renames).and_return("alt-tab" => "alttab")
+      perform_update("update_git_diff_output_with_cask_rename")
+
+      expect(hub.select_formula(:AC)).to be_empty
+      expect(hub.select_formula(:DC)).to be_empty
+      expect(hub.select_formula(:RC)).to eq([["alt-tab", "alttab"]])
+    end
+
     context "when updating a Tap other than the core Tap" do
       let(:tap) { Tap.new("foo", "bar") }
 

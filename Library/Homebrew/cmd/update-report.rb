@@ -323,38 +323,28 @@ class Reporter
 
       next unless dst.extname == ".rb"
 
-      if paths.any? { |p| tap.cask_file?(p) }
-        case status
-        when "A"
-          # Have a dedicated report array for new casks.
-          @report[:AC] << tap.formula_file_to_name(src)
-        when "D"
-          # Have a dedicated report array for deleted casks.
-          @report[:DC] << tap.formula_file_to_name(src)
-        when "M"
-          # Report updated casks
-          @report[:MC] << tap.formula_file_to_name(src)
-        end
-      end
+      cask_file = paths.any? { |p| tap.cask_file?(p) }
+      formula_file = paths.any? { |p| tap.formula_file?(p) }
 
-      next unless paths.any? { |p| tap.formula_file?(p) }
+      next if !cask_file && !formula_file
 
       case status
       when "A", "D"
         full_name = tap.formula_file_to_name(src)
         name = full_name.split("/").last
         new_tap = tap.tap_migrations[name]
+        status += "C" if cask_file
         @report[status.to_sym] << full_name unless new_tap
       when "M"
         name = tap.formula_file_to_name(src)
 
-        # Skip reporting updated formulae to speed up automatic updates.
+        # Skip reporting updated packages to speed up automatic updates.
         if preinstall
-          @report[:M] << name
+          @report[cask_file ? :MC : :M] << name
           next
         end
 
-        begin
+        begin # stopped here
           formula = Formulary.factory(tap.path/src)
           new_version = formula.pkg_version
           old_version = FormulaVersions.new(formula).formula_at_revision(@initial_revision, &:pkg_version)
@@ -366,51 +356,62 @@ class Reporter
           onoe "#{e.message}\n#{e.backtrace.join "\n"}" if Homebrew::EnvConfig.developer?
         end
 
-        @report[:M] << name
+        @report[cask_file ? :MC : :M] << name
       when /^R\d{0,3}/
         src_full_name = tap.formula_file_to_name(src)
         dst_full_name = tap.formula_file_to_name(dst)
-        # Don't report formulae that are moved within a tap but not renamed
+        # Don't report packages that are moved within a tap but not renamed
         next if src_full_name == dst_full_name
 
-        @report[:D] << src_full_name
-        @report[:A] << dst_full_name
+        @report[cask_file ? :DC : :D] << src_full_name
+        @report[cask_file ? :AC : :A] << dst_full_name
       end
     end
 
     renamed_formulae = Set.new
-    @report[:D].each do |old_full_name|
+    renamed_casks = Set.new
+    (@report[:D] + @report[:DC]).each do |old_full_name|
+      cask_file = @report[:DC].include? old_full_name
       old_name = old_full_name.split("/").last
-      new_name = tap.formula_renames[old_name]
+      new_name = (cask_file ? tap.cask_renames : tap.formula_renames)[old_name]
       next unless new_name
 
-      new_full_name = if tap.core_tap?
+      new_full_name = if cask_file ? tap.official? : tap.core_tap?
         new_name
       else
         "#{tap}/#{new_name}"
       end
 
-      renamed_formulae << [old_full_name, new_full_name] if @report[:A].include? new_full_name
+      if @report[cask_file ? :AC : :A].include? new_full_name
+        (cask_file ? renamed_casks : renamed_formulae) << [old_full_name, new_full_name]
+      end
     end
 
-    @report[:A].each do |new_full_name|
+    (@report[:A] + @report[:AC]).each do |new_full_name|
+      cask_file = @report[:AC].include? new_full_name
       new_name = new_full_name.split("/").last
-      old_name = tap.formula_renames.key(new_name)
+      old_name = (cask_file ? tap.cask_renames : tap.formula_renames).key(new_name)
       next unless old_name
 
-      old_full_name = if tap.core_tap?
+      old_full_name = if cask_file ? tap.official? : tap.core_tap?
         old_name
       else
         "#{tap}/#{old_name}"
       end
 
-      renamed_formulae << [old_full_name, new_full_name]
+      (cask_file ? renamed_casks : renamed_formulae) << [old_full_name, new_full_name]
     end
 
     unless renamed_formulae.empty?
       @report[:A] -= renamed_formulae.map(&:last)
       @report[:D] -= renamed_formulae.map(&:first)
       @report[:R] = renamed_formulae.to_a
+    end
+
+    unless renamed_casks.empty?
+      @report[:AC] -= renamed_casks.map(&:last)
+      @report[:DC] -= renamed_casks.map(&:first)
+      @report[:RC] = renamed_casks.to_a
     end
 
     @report
@@ -550,6 +551,7 @@ class ReporterHub
     @reporters = []
   end
 
+  # TODO: rename this and others to account for casks
   def select_formula(key)
     @hash.fetch(key, [])
   end
@@ -587,6 +589,7 @@ class ReporterHub
                               "Updated #{updated} #{"cask".pluralize(updated)}."
       end
     end
+    dump_formula_report :RC, "Renamed Casks"
     dump_formula_report :DC, "Deleted Casks"
   end
 
@@ -601,6 +604,12 @@ class ReporterHub
       when :R
         name = pretty_installed(name) if installed?(name)
         new_name = pretty_installed(new_name) if installed?(new_name)
+        "#{name} -> #{new_name}" unless only_installed
+      when :RC
+        name = name.split("/").last
+        new_name = name.split("/").last
+        name = pretty_installed(name) if cask_installed?(name)
+        new_name = pretty_installed(new_name) if cask_installed?(new_name)
         "#{name} -> #{new_name}" unless only_installed
       when :A
         name if !installed?(name) && !only_installed
