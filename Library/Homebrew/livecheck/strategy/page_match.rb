@@ -67,7 +67,7 @@ module Homebrew
             when String
               match
             when Array
-              match.first
+              match.join(",")
             end
           end.compact.uniq
         end
